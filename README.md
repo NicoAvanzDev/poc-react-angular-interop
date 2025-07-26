@@ -1,6 +1,20 @@
 # 🧩 Microfrontend Architecture: React Host + Angular Remote
 
-This document describes how a **React application (Vite-based)** integrates an **Angular standalone application** as a remote Microfrontend using **Webpack Module Federation** and **Web Components**.
+This docum### 2. React Host Loads Angular Remote Dynamically
+
+```tsx
+useEffect(() => {
+  import("remoteAngular/AngularApp")
+    .then(() => console.log("✅ Angular remote loaded"))
+    .catch((err) => console.error("❌ Failed to load Angular remote", err));
+}, []);
+
+return <angular-app />;
+```
+
+- `import('remoteAngular/AngularApp')` loads Angular's `remoteEntry.js` and registers the custom element.
+- React renders `<angular-app />` like a normal HTML tag.
+- Angular renders inside that DOM element independently.ow a **React application (Vite-based)** integrates an **Angular standalone application** as a remote Microfrontend using **Webpack Module Federation** and **Web Components**.
 
 ---
 
@@ -44,16 +58,25 @@ This document describes how a **React application (Vite-based)** integrates an *
 - In Angular's `bootstrap.ts`, a standalone component (`App`) is wrapped as a **Web Component**:
 
 ```ts
+import { createApplication } from "@angular/platform-browser";
 import { createCustomElement } from "@angular/elements";
+import { App } from "./app/app";
 
-customElements.define("angular-app", createCustomElement(App, { injector }));
+createApplication({
+  providers: [importProvidersFrom(BrowserModule)],
+}).then((appRef) => {
+  const injector = appRef.injector;
+  const el = createCustomElement(App, { injector });
+  customElements.define("angular-app", el);
+  console.log("✅ Angular Web Component registered");
+});
 ```
 
 - Angular's `webpack.config.js` exposes this file via:
 
 ```js
 exposes: {
-  './RemoteElement': './src/bootstrap.ts'
+  './AngularApp': './src/bootstrap.ts'
 }
 ```
 
@@ -65,7 +88,7 @@ exposes: {
 
 ```tsx
 useEffect(() => {
-  import("remoteAngular/RemoteElement").then(() =>
+  import("remoteAngular/AngularApp").then(() =>
     console.log("✅ Angular loaded")
   );
 }, []);
@@ -73,7 +96,7 @@ useEffect(() => {
 return <angular-app />;
 ```
 
-- `import('remoteAngular/RemoteElement')` loads Angular’s `remoteEntry.js` and registers the custom element.
+- `import('remoteAngular/AngularApp')` loads Angular’s `remoteEntry.js` and registers the custom element.
 - React renders `<angular-app />` like a normal HTML tag.
 - Angular renders inside that DOM element independently.
 
@@ -86,6 +109,10 @@ return <angular-app />;
 ```ts
 createApplication({
   providers: [importProvidersFrom(BrowserModule)],
+}).then((appRef) => {
+  const injector = appRef.injector;
+  const el = createCustomElement(App, { injector });
+  customElements.define("angular-app", el);
 });
 ```
 
@@ -201,16 +228,20 @@ microfrontend/
 │   │   ├── index.html       # Main HTML file
 │   │   ├── src/             # React source code
 │   │   │   ├── main.jsx      # React entry point
-│   │   │   ├── App.jsx        # Main React component
-│   │   └── vite.config.ts    # Vite configuration with Module Federation
+│   │   │   ├── App.jsx        # Main React component (imports remoteAngular/AngularApp)
+│   │   └── vite.config.js    # Vite configuration with Module Federation
 │   └── remote-angular/      # Angular Remote Application
 │       ├── package.json      # Angular app dependencies
 │       ├── src/              # Angular source code
-│       │   ├── app.ts         # Standalone Angular component
-│       │   ├── bootstrap.ts    # Web Component registration
+│       │   ├── app/           # Angular app components
+│       │   │   ├── app.ts      # Main App component (exported as Web Component)
+│       │   │   ├── app.html    # App component template
+│       │   │   └── app.scss    # App component styles
+│       │   ├── bootstrap.ts    # Web Component registration & createApplication
+│       │   └── main.ts         # Angular entry point
 │       ├── angular.json        # Angular project configuration
 │       ├── tsconfig.json       # TypeScript configuration
-│       └── webpack.config.js   # Webpack configuration for Module Federation
+│       └── webpack.config.js   # Webpack configuration exposing ./AngularApp
 ├── node_modules/          # Node.js dependencies
 ├── .gitignore              # Git ignore file
 ├── README.md               # Project documentation
@@ -236,9 +267,17 @@ federation({
 ### Angular (remote) `webpack.config.js`
 
 ```js
-exposes: {
-  './RemoteElement': './src/bootstrap.ts',
-}
+module.exports = withModuleFederationPlugin({
+  name: "remoteAngular",
+  exposes: {
+    "./AngularApp": "./src/bootstrap.ts",
+  },
+  shared: {
+    "@angular/core": { singleton: true, strictVersion: true },
+    "@angular/common": { singleton: true, strictVersion: true },
+    "@angular/router": { singleton: true, strictVersion: true },
+  },
+});
 ```
 
 ---
@@ -284,12 +323,17 @@ exposes: {
 ## 📌 Example Minimal Angular Component
 
 ```ts
+import { Component, signal } from "@angular/core";
+import { RouterOutlet } from "@angular/router";
+
 @Component({
+  selector: "app-root",
   standalone: true,
-  selector: "ignored-root",
+  imports: [RouterOutlet],
   template: `<h1>{{ title() }}</h1>`,
+  styleUrl: "./app.scss",
 })
 export class App {
-  protected readonly title = signal("Hello from Angular");
+  protected readonly title = signal("Hello from Angular Remote");
 }
 ```
