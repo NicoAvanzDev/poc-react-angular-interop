@@ -149,14 +149,43 @@ npx turbo run dev --filter=remote-angular
 
 ### Development Workflow
 
-1. **Start both applications**: `npm run dev`
+**Option 1: Sequential Start (Recommended for Module Federation)**
 
-   - React host will run on `http://localhost:5173`
-   - Angular remote will run on `http://localhost:4201`
+```bash
+# Start Angular remote first, then React host waits for it to be ready
+npm run dev:sequential
+```
 
-2. **Build for production**: `npm run build`
-   - Turborepo will build Angular first (dependency), then React host
-   - Output files will be in respective `dist/` directories
+**Option 2: Parallel Start (Faster but may have timing issues)**
+
+```bash
+# Start both apps simultaneously
+npm run dev
+```
+
+**Option 3: Manual Control**
+
+```bash
+# Start Angular remote first
+npm run dev:remote
+
+# In another terminal, start React host (it will wait for Angular to be ready)
+npm run dev:host
+```
+
+### How the Sequential Start Works
+
+1. **Angular Remote starts first**: Runs on `http://localhost:4201`
+2. **React Host waits**: Uses `wait-on` to check if Angular is ready
+3. **React Host starts**: Only after Angular's `remoteEntry.js` is available
+4. **Both apps running**: React on `http://localhost:5173`, Angular on `http://localhost:4201`
+
+### Build Process
+
+**Build for production**: `npm run build`
+
+- Turborepo will build Angular first (dependency), then React host
+- Output files will be in respective `dist/` directories
 
 ---
 
@@ -225,6 +254,30 @@ exposes: {
 - If content is invisible:
   - Ensure `BrowserModule` is provided
   - Ensure template is not empty
+
+### Common Issues
+
+- **React host starts before Angular remote is ready**:
+  - **Solution**: Use `npm run dev:sequential` instead of `npm run dev`
+  - This ensures Angular compiles and starts before React tries to connect
+- **Module Federation errors or "Loading chunk failed"**:
+
+  - **Cause**: React host tries to load Angular remote before it's ready
+  - **Solution**: Use the sequential startup or manually start Angular first
+  - Check that `remoteEntry.js` is accessible at `http://localhost:4201/remoteEntry.js`
+
+- **Only React app starts with `npm run dev`**:
+  - Ensure all apps have a `dev` script in their package.json
+  - Angular apps typically use `start` instead of `dev` by default
+- **Port conflicts**:
+
+  - React (Vite): `http://localhost:5173`
+  - Angular: `http://localhost:4201`
+  - Make sure these ports are available
+
+- **"wait-on" command not found**:
+  - Run `npm install` in the root to ensure all dependencies are installed
+  - The `wait-on` package should be installed in the React host app
 
 ---
 

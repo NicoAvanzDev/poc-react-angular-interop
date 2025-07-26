@@ -6,7 +6,10 @@
     ],
     "scripts": {
         "build": "turbo run build",
-        "dev": "turbo run dev --parallel"
+        "dev": "turbo run dev --parallel",
+        "dev:sequential": "npm run dev:remote && npm run dev:host",
+        "dev:remote": "turbo run dev --filter=remote-angular",
+        "dev:host": "turbo run dev --filter=host-react"
     },
     "devDependencies": {
         "turbo": "^2.5.5"
