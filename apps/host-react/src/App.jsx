@@ -1,3 +1,4 @@
+import "./App.css";
 import { useEffect } from "react";
 
 function App() {
@@ -8,8 +9,9 @@ function App() {
   }, []);
 
   return (
-    <div>
+    <div className="main-container">
       <h2>This is React</h2>
+      <span className="split"></span>
       <angular-app></angular-app>
     </div>
   );
